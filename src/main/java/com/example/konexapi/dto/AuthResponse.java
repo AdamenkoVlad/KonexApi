@@ -11,12 +11,12 @@ public class AuthResponse {
     private String access_token;
     private String token_type;
     private String refresh_token;
-    private String expires_in; // Changed from Long to String
+    private String expires_in; 
     private int status;
     private String message;
     private boolean success;
 
-    // Getters and Setters
+    
     public String getToken() { return token; }
     public void setToken(String token) { this.token = token; }
 
