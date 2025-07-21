@@ -69,7 +69,7 @@ public class KonexService {
             post.setHeader("Content-Type", "application/json");
             post.setHeader("Accept", "application/json");
 
-            // Створюємо запит для авторизації з вашими credentials
+            
             AuthRequest authRequest = new AuthRequest(login, password, userType);
             String jsonBody = objectMapper.writeValueAsString(authRequest);
 
@@ -88,7 +88,7 @@ public class KonexService {
                             statusCode + " - " + responseBody);
                 }
 
-                // Парсимо відповідь для отримання токену
+                
                 AuthResponse authResponse;
                 try {
                     authResponse = objectMapper.readValue(responseBody, AuthResponse.class);
@@ -113,7 +113,7 @@ public class KonexService {
 
                 System.out.println("Токен авторизації успішно отриманий: " + authToken.substring(0, Math.min(20, authToken.length())) + "...");
 
-                // Використовуємо новий метод для отримання часу закінчення
+               
                 tokenExpiry = authResponse.getExpiryDateTime();
                 System.out.println("Токен дійсний до: " + tokenExpiry);
 
@@ -124,40 +124,38 @@ public class KonexService {
     public UploadResponse uploadFiles(MultipartFile[] files, String path, String inputKey) throws IOException {
         System.out.println("Початок завантаження файлів на CDN сервер");
 
-        // Спочатку отримуємо токен авторизації
+        
         String token = getAuthToken();
         System.out.println("Використовуємо токен для завантаження: " + token.substring(0, Math.min(20, token.length())) + "...");
 
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             HttpPost post = new HttpPost(cdnUploadUrl);
 
-            // Створюємо multipart запит згідно з документацією Konex CDN API
+            
             MultipartEntityBuilder builder = MultipartEntityBuilder.create();
 
-            // Обов'язковий параметр: токен авторизації
+            
             builder.addTextBody("token", token);
 
-            // Опціональний параметр: структура директорій
+            
             if (path != null && !path.trim().isEmpty()) {
                 builder.addTextBody("path", path);
                 System.out.println("Завантажуємо у директорію: " + path);
             }
 
-            // Опціональний параметр: name ключа для передачі файла
+            
             String inputKeyName = inputKey != null && !inputKey.trim().isEmpty() ? inputKey : "file";
             builder.addTextBody("input", inputKeyName);
             System.out.println("Використовуємо input key: " + inputKeyName);
 
-            // Додаємо файли до запиту
+           
             System.out.println("Додаємо " + files.length + " файл(ів) до запиту:");
             for (int i = 0; i < files.length; i++) {
                 MultipartFile file = files[i];
                 if (!file.isEmpty()) {
                     System.out.println("  - " + file.getOriginalFilename() + " (" + file.getSize() + " bytes)");
 
-                    // Використовуємо inputKeyName як ім'я поля для файлу
-                    // Якщо це перший файл, використовуємо просто inputKeyName
-                    // Для наступних файлів додаємо індекс (file1, file2, etc.)
+                    
                     String fieldName = i == 0 ? inputKeyName : inputKeyName + i;
 
                     builder.addBinaryBody(
@@ -187,7 +185,7 @@ public class KonexService {
 
                 UploadResponse uploadResponse = objectMapper.readValue(responseBody, UploadResponse.class);
 
-                // Зберігаємо інформацію про завантажені файли в базу даних
+                
                 saveUploadedFiles(files, uploadResponse, path);
 
                 System.out.println("Файли успішно завантажені на CDN!");
@@ -220,9 +218,9 @@ public class KonexService {
         return fileRepository.findAllById(ids);
     }
 
-    // Метод для отримання фото з пагинацією (якщо потрібно буде додати в репозиторій)
+    
     public List<UploadedFile> getPhotosWithPagination(int page, int size) {
-        // Тимчасова реализація без Spring Data пагинації
+        
         List<UploadedFile> allPhotos = fileRepository.findAll();
         int start = page * size;
         int end = Math.min(start + size, allPhotos.size());
@@ -239,18 +237,18 @@ public class KonexService {
     public UploadResponse uploadPhotosWithProcessing(MultipartFile[] files, String path, String inputKey) throws IOException {
         System.out.println("Початок завантаження фото з обробкою зображень");
 
-        // Обробляємо кожен файл
+       
         MultipartFile[] processedFiles = new MultipartFile[files.length];
         for (int i = 0; i < files.length; i++) {
             System.out.println("Обробка файлу " + (i + 1) + "/" + files.length + ": " + files[i].getOriginalFilename());
             processedFiles[i] = imageProcessingService.processImage(files[i]);
         }
 
-        // Використовуємо існуючий метод для завантаження
+        
         return uploadFiles(processedFiles, path, inputKey);
     }
 
-    // Перевантажений метод без inputKey
+    
     public UploadResponse uploadPhotosWithProcessing(MultipartFile[] files, String path) throws IOException {
         return uploadPhotosWithProcessing(files, path, "file");
     }
