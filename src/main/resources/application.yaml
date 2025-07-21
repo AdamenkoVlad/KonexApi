@@ -1,0 +1,35 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/photocdn
+    username: postgres
+    password: 4556
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 50MB
+
+konex:
+  auth:
+    url: https://auth.konex.com.ua/login
+    login: test1
+    password: 9S27Zaf2vS
+    user-type: user_company
+  cdn:
+    upload-url: https://cdn.konex.com.ua/upload/
+app:
+  admin:
+    login: admin
+    password: 4556

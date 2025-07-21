@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="uk" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Галерея фотографій</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .photo-card {
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .photo-card:hover {
+            transform: scale(1.05);
+        }
+        .photo-img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+        .fullscreen-modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+        }
+        .fullscreen-modal img {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            max-width: 90%;
+            max-height: 90%;
+        }
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+        }
+        .photo-info {
+            padding: 10px;
+            background: #f8f9fa;
+        }
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .no-photos {
+            text-align: center;
+            margin: 50px 0;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+        <a class="navbar-brand" href="/">
+            <i class="fas fa-images"></i> Галерея фотографій
+        </a>
+        <div class="navbar-nav ms-auto">
+            <a class="nav-link" href="/admin">
+                <i class="fas fa-cog"></i> Адмін панель
+            </a>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2>Галерея фотографій</h2>
+        </div>
+        <div class="col-md-4 text-end">
+            <button id="downloadSelected" class="btn btn-success me-2" style="display: none;">
+                <i class="fas fa-download"></i> Завантажити вибрані
+            </button>
+            <button id="downloadAll" class="btn btn-primary">
+                <i class="fas fa-download"></i> Завантажити всі
+            </button>
+        </div>
+    </div>
+
+    <!-- Фотографії -->
+    <div id="photoGallery" class="row">
+        <!-- Тут будуть завантажуватися фотографії -->
+    </div>
+
+    <!-- Кнопка "Показати більше" -->
+    <div class="text-center mt-4">
+        <button id="loadMore" class="btn btn-outline-primary" style="display: none;">
+            <i class="fas fa-plus"></i> Показати більше
+        </button>
+    </div>
+
+    <!-- Індикатор завантаження -->
+    <div id="loading" class="loading" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Завантаження...</span>
+        </div>
+        <p class="mt-2">Завантаження фотографій...</p>
+    </div>
+
+    <!-- Повідомлення про відсутність фотографій -->
+    <div id="noPhotos" class="no-photos" style="display: none;">
+        <i class="fas fa-images fa-3x text-muted mb-3"></i>
+        <h4>Поки що немає фотографій</h4>
+        <p>Завантажте фотографії через <a href="/admin">адмін панель</a></p>
+    </div>
+</div>
+
+<!-- Модальне вікно для повноекранного перегляду -->
+<div id="fullscreenModal" class="fullscreen-modal">
+    <span class="close-btn">&times;</span>
+    <img id="fullscreenImage" src="" alt="">
+    <div id="imageInfo" style="position: absolute; bottom: 20px; left: 20px; color: white; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px;">
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script>
+    let currentPage = 0;
+    let totalPages = 0;
+    let selectedPhotos = new Set();
+
+    // Завантажити фотографії
+    async function loadPhotos(page = 0) {
+        const loading = document.getElementById('loading');
+        const gallery = document.getElementById('photoGallery');
+        const loadMore = document.getElementById('loadMore');
+        const noPhotos = document.getElementById('noPhotos');
+
+        loading.style.display = 'block';
+
+        try {
+            const response = await fetch(`/api/photos/gallery?page=${page}&size=10`);
+            const data = await response.json();
+
+            if (page === 0) {
+                gallery.innerHTML = '';
+            }
+
+            if (data.photos && data.photos.length > 0) {
+                noPhotos.style.display = 'none';
+
+                data.photos.forEach(photo => {
+                    const photoCard = createPhotoCard(photo);
+                    gallery.appendChild(photoCard);
+                });
+
+                currentPage = data.currentPage;
+                totalPages = data.totalPages;
+
+                // Показати кнопку "Показати більше" якщо є ще сторінки
+                loadMore.style.display = data.hasNext ? 'block' : 'none';
+            } else if (page === 0) {
+                noPhotos.style.display = 'block';
+                loadMore.style.display = 'none';
+            }
+
+        } catch (error) {
+            console.error('Помилка завантаження фотографій:', error);
+            if (page === 0) {
+                noPhotos.style.display = 'block';
+            }
+        } finally {
+            loading.style.display = 'none';
+        }
+    }
+
+
+    function createPhotoCard(photo) {
+        const col = document.createElement('div');
+        col.className = 'col-lg-3 col-md-4 col-sm-6';
+
+        col.innerHTML = `
+                <div class="photo-card" data-photo-id="${photo.id}">
+                    <img src="${photo.cdnUrl}" alt="${photo.originalFilename}" class="photo-img"
+                         onclick="openFullscreen('${photo.cdnUrl}', '${photo.originalFilename}', '${formatDate(photo.uploadedAt)}', '${formatFileSize(photo.fileSize)}')">
+                    <div class="photo-info">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">${photo.originalFilename}</small>
+                            <div>
+                                <input type="checkbox" class="photo-select me-2" data-photo-id="${photo.id}" onchange="togglePhotoSelection(${photo.id})">
+                                <button class="btn btn-sm btn-outline-danger" onclick="deletePhoto(${photo.id})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <small class="text-muted d-block">${formatDate(photo.uploadedAt)}</small>
+                        <small class="text-muted">${formatFileSize(photo.fileSize)}</small>
+                    </div>
+                </div>
+            `;
+
+        return col;
+    }
+
+
+    function openFullscreen(imageUrl, filename, uploadDate, fileSize) {
+        const modal = document.getElementById('fullscreenModal');
+        const image = document.getElementById('fullscreenImage');
+        const info = document.getElementById('imageInfo');
+
+        image.src = imageUrl;
+        info.innerHTML = `
+                <strong>${filename}</strong><br>
+                Завантажено: ${uploadDate}<br>
+                Розмір: ${fileSize}
+            `;
+        modal.style.display = 'block';
+    }
+
+
+    function closeFullscreen() {
+        document.getElementById('fullscreenModal').style.display = 'none';
+    }
+
+
+    function togglePhotoSelection(photoId) {
+        if (selectedPhotos.has(photoId)) {
+            selectedPhotos.delete(photoId);
+        } else {
+            selectedPhotos.add(photoId);
+        }
+
+        const downloadSelected = document.getElementById('downloadSelected');
+        downloadSelected.style.display = selectedPhotos.size > 0 ? 'inline-block' : 'none';
+    }
+
+
+    async function deletePhoto(photoId) {
+        if (!confirm('Ви впевнені, що хочете видалити цю фотографію?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/photos/${photoId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+
+                const photoCard = document.querySelector(`[data-photo-id="${photoId}"]`).closest('.col-lg-3');
+                photoCard.remove();
+
+
+                selectedPhotos.delete(photoId);
+                const downloadSelected = document.getElementById('downloadSelected');
+                downloadSelected.style.display = selectedPhotos.size > 0 ? 'inline-block' : 'none';
+
+                alert('Фотографію видалено успішно!');
+            } else {
+                alert('Помилка видалення фотографії');
+            }
+        } catch (error) {
+            console.error('Помилка видалення:', error);
+            alert('Помилка видалення фотографії');
+        }
+    }
+
+
+    async function downloadAllPhotos() {
+        try {
+            window.location.href = '/api/photos/download-all';
+        } catch (error) {
+            console.error('Помилка завантаження:', error);
+            alert('Помилка завантаження архіву');
+        }
+    }
+
+
+    async function downloadSelectedPhotos() {
+        if (selectedPhotos.size === 0) {
+            alert('Виберіть фотографії для завантаження');
+            return;
+        }
+
+        try {
+            const ids = Array.from(selectedPhotos).join(',');
+            window.location.href = `/api/photos/download-all?ids=${ids}`;
+        } catch (error) {
+            console.error('Помилка завантаження:', error);
+            alert('Помилка завантаження архіву');
+        }
+    }
+
+
+    function formatDate(dateString) {
+        return new Date(dateString).toLocaleString('uk-UA');
+    }
+
+    function formatFileSize(bytes) {
+        if (!bytes) return 'Невідомо';
+        const sizes = ['Б', 'КБ', 'МБ', 'ГБ'];
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+
+    document.getElementById('loadMore').addEventListener('click', () => {
+        loadPhotos(currentPage + 1);
+    });
+
+    document.getElementById('downloadAll').addEventListener('click', downloadAllPhotos);
+    document.getElementById('downloadSelected').addEventListener('click', downloadSelectedPhotos);
+
+    document.getElementById('fullscreenModal').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) {
+            closeFullscreen();
+        }
+    });
+
+    document.querySelector('.close-btn').addEventListener('click', closeFullscreen);
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeFullscreen();
+        }
+    });
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadPhotos(0);
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Адмін панель - Завантаження фотографій</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+
+        .upload-area.dragover {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+
+        .file-preview {
+            margin-top: 20px;
+        }
+
+        .preview-item {
+            position: relative;
+            display: inline-block;
+            margin: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .preview-img {
+            width: 150px;
+            height: 150px;
+            object-fit: cover;
+        }
+
+        .remove-file {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: red;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .upload-progress {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .history-table {
+            margin-top: 30px;
+        }
+
+        .thumbnail {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 5px;
+        }
+
+        .status-message {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+        <a class="navbar-brand" href="/admin">
+            <i class="fas fa-cog"></i> Адмін панель
+        </a>
+        <div class="navbar-nav ms-auto">
+            <a class="nav-link" href="/"><i class="fas fa-images"></i> Переглянути галерею</a>
+            <a class="nav-link" href="/logout"><i class="fas fa-sign-out-alt"></i> Вийти</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="fas fa-cloud-upload-alt"></i> Завантаження фотографій</h4>
+                </div>
+                <div class="card-body">
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="pathInput" class="form-label">Директорія (опціонально):</label>
+                            <input type="text" class="form-control" id="pathInput" name="path"
+                                   placeholder="Наприклад: events/2024/spring">
+                            <small class="form-text text-muted">Залиште порожнім для завантаження в корінь</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Тип завантаження:</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="uploadType" id="uploadSimple"
+                                       value="simple" checked>
+                                <label class="form-check-label" for="uploadSimple">Звичайне завантаження</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="uploadType" id="uploadProcessed"
+                                       value="processed">
+                                <label class="form-check-label" for="uploadProcessed">З обробкою (обрізка до 512x512,
+                                    стиснення)</label>
+                            </div>
+                        </div>
+
+                        <div class="upload-area" id="uploadArea">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                            <h5>Перетягніть фотографії сюди або клікніть для вибору</h5>
+                            <p class="text-muted">Підтримуються формати: JPG, JPEG, PNG (до 50 файлів)</p>
+                            <input type="file" id="fileInput" name="files" multiple accept="image/*"
+                                   style="display: none;">
+                        </div>
+
+                        <div id="filePreview" class="file-preview"></div>
+
+                        <div id="uploadProgress" class="upload-progress">
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <small class="text-muted mt-2 d-block">Завантаження файлів...</small>
+                        </div>
+
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>
+                                <i class="fas fa-upload"></i> Завантажити фотографії
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="clearBtn">
+                                <i class="fas fa-times"></i> Очистити
+                            </button>
+                        </div>
+                    </form>
+
+                    <div id="statusMessage" class="status-message"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-info-circle"></i> Інформація</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> Максимум 50 файлів за раз</li>
+                        <li><i class="fas fa-check text-success"></i> Формати: JPG, JPEG, PNG</li>
+                        <li><i class="fas fa-check text-success"></i> Автоматичне збереження в базу</li>
+                        <li><i class="fas fa-check text-success"></i> Завантаження на Konex CDN</li>
+                    </ul>
+                    <hr>
+                    <h6>Обробка зображень:</h6>
+                    <small class="text-muted">
+                        При виборі обробки зображення будуть:
+                        <ul class="small">
+                            <li>Обрізані до розміру 512x512</li>
+                            <li>Стиснені для оптимізації</li>
+                            <li>Конвертовані в JPEG</li>
+                        </ul>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Історія -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-history"></i> Останні завантаження</h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="location.reload()">
+                        <i class="fas fa-refresh"></i> Оновити
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="historyTable"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script>
+    let selectedFiles = [];
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const filePreview = document.getElementById('filePreview');
+    const uploadForm = document.getElementById('uploadForm');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const statusMessage = document.getElementById('statusMessage');
+    const uploadProgress = document.getElementById('uploadProgress');
+
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', e => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+    uploadArea.addEventListener('dragleave', e => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+    });
+    uploadArea.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        addFiles(Array.from(e.dataTransfer.files));
+    });
+    fileInput.addEventListener('change', e => addFiles(Array.from(e.target.files)));
+    clearBtn.addEventListener('click', clearFiles);
+    uploadForm.addEventListener('submit', handleSubmit);
+
+    function addFiles(newFiles) {
+        const imageFiles = newFiles.filter(file => file.type.startsWith('image/'));
+        if (imageFiles.length !== newFiles.length) showStatus('Деякі файли не є зображеннями', 'warning');
+        selectedFiles = [...selectedFiles, ...imageFiles].slice(0, 50);
+        if (selectedFiles.length === 50) showStatus('Досягнуто максимум 50 файлів', 'warning');
+        updatePreview();
+        updateUploadButton();
+    }
+
+    function updatePreview() {
+        filePreview.innerHTML = '';
+        selectedFiles.forEach((file, index) => {
+            const previewItem = document.createElement('div');
+            previewItem.className = 'preview-item';
+            const img = document.createElement('img');
+            img.className = 'preview-img';
+            img.src = URL.createObjectURL(file);
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-file';
+            removeBtn.innerHTML = '×';
+            removeBtn.onclick = () => removeFile(index);
+            const fileName = document.createElement('small');
+            fileName.className = 'd-block text-center text-muted p-2';
+            fileName.textContent = file.name.length > 20 ? file.name.substring(0, 20) + '...' : file.name;
+            previewItem.appendChild(img);
+            previewItem.appendChild(removeBtn);
+            previewItem.appendChild(fileName);
+            filePreview.appendChild(previewItem);
+        });
+    }
+
+    function removeFile(index) {
+        selectedFiles.splice(index, 1);
+        updatePreview();
+        updateUploadButton();
+    }
+
+    function clearFiles() {
+        selectedFiles = [];
+        fileInput.value = '';
+        updatePreview();
+        updateUploadButton();
+        hideStatus();
+    }
+
+    function updateUploadButton() {
+        uploadBtn.disabled = selectedFiles.length === 0;
+    }
+
+    async function handleSubmit(e) {
+        e.preventDefault();
+        if (selectedFiles.length === 0) return showStatus('Оберіть файли', 'warning');
+        const formData = new FormData();
+        const path = document.getElementById('pathInput').value;
+        const uploadType = document.querySelector('input[name="uploadType"]:checked').value;
+        selectedFiles.forEach(file => formData.append('files', file));
+        if (path) formData.append('path', path);
+        formData.append('input', 'file');
+        const endpoint = uploadType === 'processed' ? '/api/v1/upload-photos' : '/api/v1/upload';
+        try {
+            showProgress();
+            uploadBtn.disabled = true;
+            const response = await fetch(endpoint, {method: 'POST', body: formData});
+            const result = await response.json();
+            if (response.ok) {
+                showStatus(`Успішно завантажено ${selectedFiles.length} файл(ів)!`, 'success');
+                clearFiles();
+                loadUploadHistory();
+            } else {
+                showStatus(`Помилка: ${result.message || 'Невідома помилка'}`, 'danger');
+            }
+        } catch (error) {
+            console.error(error);
+            showStatus('Помилка зʼєднання з сервером', 'danger');
+        } finally {
+            hideProgress();
+            uploadBtn.disabled = false;
+        }
+    }
+
+    function showProgress() {
+        uploadProgress.style.display = 'block';
+        const progressBar = uploadProgress.querySelector('.progress-bar');
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += 10;
+            progressBar.style.width = progress + '%';
+            if (progress >= 90) clearInterval(interval);
+        }, 200);
+    }
+
+    function hideProgress() {
+        uploadProgress.style.display = 'none';
+        uploadProgress.querySelector('.progress-bar').style.width = '0%';
+    }
+
+    function showStatus(message, type) {
+        statusMessage.innerHTML = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+    }
+
+    function hideStatus() {
+        statusMessage.innerHTML = '';
+    }
+
+    async function loadUploadHistory() {
+        try {
+            const response = await fetch('/api/v1/history');
+            const history = await response.json();
+            const historyTable = document.getElementById('historyTable');
+            if (history.length === 0) {
+                historyTable.innerHTML = '<p class="text-muted">Поки що немає завантажених файлів</p>';
+                return;
+            }
+            let tableHTML = `
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Мініатюра</th>
+                                <th>Імʼя файлу</th>
+                                <th>Шлях</th>
+                                <th>Дата</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            history.forEach(item => {
+                tableHTML += `
+                    <tr>
+                        <td><img src="${item.url}" class="thumbnail" alt="thumbnail"></td>
+                        <td>${item.filename}</td>
+                        <td>${item.path || '-'}</td>
+                        <td>${new Date(item.uploadedAt).toLocaleString()}</td>
+                    </tr>
+                `;
+            });
+            tableHTML += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            historyTable.innerHTML = tableHTML;
+        } catch (error) {
+            console.error('Помилка при завантаженні історії:', error);
+            document.getElementById('historyTable').innerHTML =
+                '<div class="alert alert-danger">Не вдалося завантажити історію</div>';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadUploadHistory();
+    });
+</script>
+</body>
+</html>
