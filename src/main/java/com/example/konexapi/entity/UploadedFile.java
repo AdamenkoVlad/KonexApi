@@ -29,7 +29,7 @@ public class UploadedFile {
     @Column
     private String contentType;
 
-    // Constructors
+    
     public UploadedFile() {}
 
     public UploadedFile(String originalFilename, String cdnUrl, String path, Long fileSize, String contentType) {
@@ -41,7 +41,7 @@ public class UploadedFile {
         this.uploadedAt = LocalDateTime.now();
     }
 
-    // Getters and Setters
+    
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
